@@ -1,0 +1,38 @@
+# Python
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# PHP / Laravel
+**/vendor/
+**/node_modules/
+**/storage/logs/*
+**/bootstrap/cache/*
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/
+
+# Local databases and generated data
+*.sqlite
+*.sqlite3
+*.db
+**/rabbitmq-data/
+**/postgres-data/
+
+# IDE and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
