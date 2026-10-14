@@ -1,8 +1,13 @@
+
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models import Order, OrderItem
+from models import Order, OrderItem, OutboxMessage
 from schemas import OrderSchema
-from sqlalchemy.exc import IntegrityError
+
+
+class DuplicateOrderError(Exception):
+    pass
 
 
 def create_order(db: Session, order_data: OrderSchema) -> Order:
@@ -24,9 +29,25 @@ def create_order(db: Session, order_data: OrderSchema) -> Order:
         order.items.append(item)
 
     try:
+        # Save the order and its items within the current transaction.
         db.add(order)
+        db.flush()
+
+        # Build the event that will eventually be published to RabbitMQ.
+        outbox_message = OutboxMessage(
+            order_id=order.id,
+            event_type="order.created",
+            payload={
+                "order_id": order.id,
+                "external_order_id": order.external_order_id,
+            },
+        )
+        db.add(outbox_message)
+
+        # Commit both the order and the outbox message atomically.
         db.commit()
         db.refresh(order)
+
     except IntegrityError as exc:
         db.rollback()
 
@@ -42,11 +63,9 @@ def create_order(db: Session, order_data: OrderSchema) -> Order:
             ) from exc
 
         raise
+
     except Exception:
         db.rollback()
         raise
 
     return order
-
-class DuplicateOrderError(Exception):
-    pass

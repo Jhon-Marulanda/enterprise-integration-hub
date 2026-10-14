@@ -1,4 +1,5 @@
-from fastapi import Depends, FastAPI, status
+
+from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -32,8 +33,6 @@ def receive_order(
     try:
         saved_order = create_order(db, order)
     except DuplicateOrderError as exc:
-        from fastapi import HTTPException
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
