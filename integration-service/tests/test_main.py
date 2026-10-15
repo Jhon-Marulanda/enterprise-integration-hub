@@ -1,12 +1,14 @@
-from fastapi.testclient import TestClient
-
-from main import app
+from datetime import datetime, timezone
 from decimal import Decimal
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
+
+from main import app
 from schemas import OrderSchema
-from uuid import uuid4
 
 client = TestClient(app)
 
@@ -140,3 +142,78 @@ def test_duplicate_order_returns_409():
     assert second_response.json()["detail"] == (
         "An order with this external ID already exists."
     )
+
+
+class FakeSession:
+    def __init__(self, order):
+        self.order = order
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
+
+    def scalar(self, statement):
+        return self.order
+
+
+def test_graphql_returns_order(monkeypatch):
+    order = SimpleNamespace(
+        external_order_id="ORD-GRAPHQL-001",
+        status="succeeded",
+        currency="COP",
+        created_at=datetime(2026, 10, 14, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 10, 14, tzinfo=timezone.utc),
+    )
+
+    monkeypatch.setattr(
+        "graphql_schema.SessionLocal",
+        lambda: FakeSession(order),
+    )
+
+    response = client.post(
+        "/graphql",
+        json={
+            "query": """
+                query {
+                    order(externalOrderId: "ORD-GRAPHQL-001") {
+                        externalOrderId
+                        status
+                        currency
+                    }
+                }
+            """
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["order"] == {
+        "externalOrderId": "ORD-GRAPHQL-001",
+        "status": "succeeded",
+        "currency": "COP",
+    }
+
+
+def test_graphql_returns_null_when_order_not_found(monkeypatch):
+    monkeypatch.setattr(
+        "graphql_schema.SessionLocal",
+        lambda: FakeSession(None),
+    )
+
+    response = client.post(
+        "/graphql",
+        json={
+            "query": """
+                query {
+                    order(externalOrderId: "DOES-NOT-EXIST") {
+                        externalOrderId
+                        status
+                    }
+                }
+            """
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["order"] is None

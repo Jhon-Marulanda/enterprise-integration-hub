@@ -1,10 +1,12 @@
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy.orm import Session
+from strawberry.fastapi import GraphQLRouter
 
 from database import get_db
 from order_service import DuplicateOrderError, create_order
 from schemas import OrderSchema
+from graphql_schema import schema
 
 app = FastAPI(
     title="Enterprise Integration Hub",
@@ -12,6 +14,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
+graphql_app = GraphQLRouter(schema)
+app.include_router(graphql_app, prefix="/graphql")
 
 @app.get("/health", tags=["Health"])
 def health_check():
